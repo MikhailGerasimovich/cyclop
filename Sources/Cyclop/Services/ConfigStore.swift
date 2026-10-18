@@ -25,6 +25,46 @@ final class ConfigStore: ObservableObject {
         var fontSize: Double = 30
     }
 
+    /// Processing through a language model, for the Markdown converter. The
+    /// provider, the model and the address make sense on another Mac; the
+    /// API key does not belong in a file meant to be handed around, and lives
+    /// in the Keychain — see `LLMSettings`.
+    struct AI: Codable, Equatable {
+        /// Remembered per provider, so switching to try another one and back
+        /// does not lose the model that was chosen for the first.
+        struct Endpoint: Codable, Equatable {
+            var model = ""
+            var baseURL = ""
+
+            init(model: String = "", baseURL: String = "") {
+                self.model = model
+                self.baseURL = baseURL
+            }
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                model = try c.decodeIfPresent(String.self, forKey: .model) ?? ""
+                baseURL = try c.decodeIfPresent(String.self, forKey: .baseURL) ?? ""
+            }
+        }
+
+        var enabled = false
+        var provider = "anthropic"
+        var endpoints: [String: Endpoint] = [:]
+
+        init() {}
+
+        /// Same rule as `File` below: a key that is not there is a default,
+        /// never a broken file.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            let d = AI()
+            enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? d.enabled
+            provider = try c.decodeIfPresent(String.self, forKey: .provider) ?? d.provider
+            endpoints = try c.decodeIfPresent([String: Endpoint].self, forKey: .endpoints) ?? d.endpoints
+        }
+    }
+
     private struct File: Codable, Equatable {
         var showOnAllDisplays = true
         var saveClipboardImages = true
@@ -32,6 +72,7 @@ final class ConfigStore: ObservableObject {
         var teleprompter = Teleprompter()
         var hiddenTabs: [String] = []
         var fullSizeDrawnNotch = false
+        var ai = AI()
 
         init() {}
 
@@ -49,6 +90,7 @@ final class ConfigStore: ObservableObject {
             teleprompter = try c.decodeIfPresent(Teleprompter.self, forKey: .teleprompter) ?? d.teleprompter
             hiddenTabs = try c.decodeIfPresent([String].self, forKey: .hiddenTabs) ?? d.hiddenTabs
             fullSizeDrawnNotch = try c.decodeIfPresent(Bool.self, forKey: .fullSizeDrawnNotch) ?? d.fullSizeDrawnNotch
+            ai = try c.decodeIfPresent(AI.self, forKey: .ai) ?? d.ai
         }
     }
 
@@ -130,6 +172,11 @@ final class ConfigStore: ObservableObject {
     var hiddenTabs: [String] {
         get { value.hiddenTabs }
         set { value.hiddenTabs = newValue; persist() }
+    }
+
+    var ai: AI {
+        get { value.ai }
+        set { value.ai = newValue; persist() }
     }
 
     // MARK: - Migration

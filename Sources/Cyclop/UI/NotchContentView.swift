@@ -131,7 +131,7 @@ struct NotchContentView: View {
         case .notes:
             NotesCounter(notes: vm.notes)
         case .markdown:
-            MarkdownCounter(markdown: vm.markdown)
+            MarkdownCounter(markdown: vm.markdown, tokens: vm.tokens)
         case .teleprompter:
             EmptyView()
         case .utilities:
@@ -214,7 +214,7 @@ struct NotchContentView: View {
         case .utilities:
             UtilitiesPane(lock: vm.keyboardLock)
         case .settings:
-            SettingsPane(vm: vm, shelf: vm.shelf, screenshots: vm.screenshotFolder)
+            SettingsPane(vm: vm, shelf: vm.shelf, screenshots: vm.screenshotFolder, llm: vm.llm, tokens: vm.tokens)
         }
     }
 }
@@ -237,15 +237,23 @@ private struct NotesCounter: View {
 
 /// Same reason as `NotesCounter`: the converter's link field is typed into,
 /// so its store is not forwarded through the view model.
+/// The total spent on the model sits next to the count once there is one —
+/// the per-file figures are on the cards, the sum of everything is here.
 private struct MarkdownCounter: View {
     @ObservedObject var markdown: MarkdownStore
+    @ObservedObject var tokens: TokenLedger
 
     var body: some View {
-        if !markdown.documents.isEmpty {
-            Text("\(markdown.documents.count)")
-                .font(.system(size: 10, weight: .medium).monospacedDigit())
-                .foregroundStyle(Theme.tertiary)
+        HStack(spacing: 8) {
+            if tokens.total.requests > 0 {
+                Text(MarkdownStore.tokens(tokens.total.total))
+            }
+            if !markdown.documents.isEmpty {
+                Text("\(markdown.documents.count)")
+            }
         }
+        .font(.system(size: 10, weight: .medium).monospacedDigit())
+        .foregroundStyle(Theme.tertiary)
     }
 }
 

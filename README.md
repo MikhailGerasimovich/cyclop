@@ -86,6 +86,19 @@ Tools/markitdown/install.sh ../markitdown   # from a clone of microsoft/markitdo
 brew install exiftool ffmpeg                # optional: image/audio metadata, mp3 and m4a speech
 ```
 
+**AI processing** is optional and off by default: Settings → AI. With it on,
+a language model describes pictures and reads the text in images inside PDF,
+Word, PowerPoint and Excel, and in scanned pages. The provider is a choice —
+Anthropic (Claude, through the official SDK), OpenAI, Google Gemini,
+OpenRouter, a local Ollama or LM Studio, or any other OpenAI-compatible
+address — along with the model (the list comes from the provider itself),
+the API address and the key. The key is kept in the Keychain, everything else
+in `config.json`; the switch wins over all of it, so a stored key turns
+nothing on by itself. Each picture or page is one request. Every card shows
+what its conversion spent, if it called the model at all, and the total since
+the last reset is in Settings and in the tab's header
+(`~/Library/Application Support/Cyclop/llm-usage.json`).
+
 ## Installation
 
 Open `Cyclop-<version>.dmg` and drag the app into Applications. It opens on

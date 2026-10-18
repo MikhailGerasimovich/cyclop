@@ -26,6 +26,7 @@ struct MarkdownPane: View {
         .padding(.top, 2)
         .animation(Theme.contentAnimation, value: markdown.current)
         .animation(Theme.contentAnimation, value: markdown.failure)
+        .animation(Theme.contentAnimation, value: markdown.notice)
         .animation(Theme.contentAnimation, value: markdown.setup)
         .onAppear { focused = wantsKeyboard }
         .onChange(of: wantsKeyboard) { _, wants in focused = wants }
@@ -94,6 +95,21 @@ struct MarkdownPane: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(Color.orange.opacity(0.85))
                 Text(failure)
+                    .lineLimit(2)
+                    .foregroundStyle(Theme.secondary)
+                    .textSelection(.enabled)
+                Spacer(minLength: 4)
+                dismissButton(help: localized("Hide")) { markdown.dismissFailure() }
+            }
+            .font(.system(size: 10))
+            .padding(.horizontal, 4)
+            .transition(.opacity)
+        } else if let notice = markdown.notice {
+            // The file came out; this is about what the model did not add.
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(Theme.secondary)
+                Text(notice)
                     .lineLimit(2)
                     .foregroundStyle(Theme.secondary)
                     .textSelection(.enabled)
@@ -202,6 +218,20 @@ struct MarkdownPane: View {
                     .textSelection(.enabled)
                     .padding(.horizontal, 20)
                 installButton(localized("Retry"))
+            case .outdated:
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 20, weight: .light))
+                    .foregroundStyle(.white)
+                Text(localized("Update the Markdown converter"))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white)
+                Text(markdown.canInstall
+                     ? localized("This version adds AI processing: provider SDKs\nand the OCR plugin for pictures inside documents")
+                     : localized("Run Tools/markitdown/install.sh from the repository"))
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.tertiary)
+                    .multilineTextAlignment(.center)
+                if markdown.canInstall { installButton(localized("Update")) }
             case .missing, .ready:
                 Image(systemName: "arrow.down.doc")
                     .font(.system(size: 22, weight: .light))
@@ -261,6 +291,7 @@ private struct MarkdownRow: View {
                 Text(meta)
                     .font(.system(size: 9).monospacedDigit())
                     .foregroundStyle(Theme.tertiary)
+                    .lineLimit(1)
             }
             Spacer(minLength: 56)
         }
@@ -291,6 +322,7 @@ private struct MarkdownRow: View {
             .padding(.trailing, 11)
         }
         .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .help(usageHelp)
         .contextMenu {
             Button("Copy") { markdown.copy(document) }
             Button("Open") { markdown.open(document) }
@@ -300,9 +332,29 @@ private struct MarkdownRow: View {
         }
     }
 
+    private var usage: TokenLedger.Entry? { markdown.usage(for: document) }
+
+    /// Tokens only when the model was actually called for this file: a card
+    /// without a figure is a conversion that cost nothing.
     private var meta: String {
         let size = ByteCountFormatter.string(fromByteCount: Int64(document.size), countStyle: .file)
         let style = Date.RelativeFormatStyle(presentation: .named, locale: Locale(identifier: appLanguage))
-        return "\(size) · \(document.date.formatted(style))"
+        var parts = [size, document.date.formatted(style)]
+        if let usage { parts.append(MarkdownStore.tokens(usage.usage.total)) }
+        return parts.joined(separator: " · ")
+    }
+
+    /// The breakdown behind the figure, on hover.
+    private var usageHelp: String {
+        guard let usage else { return "" }
+        let locale = Locale(identifier: appLanguage)
+        return localized(
+            "%@ · %@\nInput: %@ · output: %@ · requests: %d",
+            usage.provider,
+            usage.model,
+            usage.usage.input.formatted(.number.locale(locale)),
+            usage.usage.output.formatted(.number.locale(locale)),
+            usage.usage.requests
+        )
     }
 }

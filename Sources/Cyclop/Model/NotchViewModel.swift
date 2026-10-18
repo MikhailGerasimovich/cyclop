@@ -196,8 +196,14 @@ final class NotchViewModel: ObservableObject {
     /// hover request on arrival is one chance, and a click has to be the
     /// second. With a script in it the tab is read, not written, and a click
     /// on play must not dim the caret of the window underneath.
+    ///
+    /// Settings does too, for its AI fields — an address, a key, a model.
+    /// Only on a click: hovering through settings on the way to a switch must
+    /// not take the keyboard, but a click is how one reaches a field there.
     var clickTakesKeyboard: Bool {
-        tab.needsKeyboard || (tab == .teleprompter && teleprompter.script.isEmpty)
+        tab.needsKeyboard
+            || (tab == .teleprompter && teleprompter.script.isEmpty)
+            || tab == .settings
     }
 
     @Published var tab: Tab = .media {
@@ -257,6 +263,10 @@ final class NotchViewModel: ObservableObject {
     let notes: NoteStore
     let teleprompter: TeleprompterStore
     let markdown: MarkdownStore
+    /// The converter's language model: provider, model, key, the switch.
+    let llm = LLMSettings()
+    /// What that model has cost, in total and per converted file.
+    let tokens = TokenLedger()
     /// Shared by every pane that shows something worth not showing.
     let privacy = PrivacyMode()
     /// Here rather than in the controller, which now rebuilds a window per
@@ -277,7 +287,7 @@ final class NotchViewModel: ObservableObject {
         self.snippets = SnippetStore()
         self.notes = NoteStore()
         self.teleprompter = TeleprompterStore()
-        self.markdown = MarkdownStore()
+        self.markdown = MarkdownStore(llm: llm, ledger: tokens)
 
         // The panel header reads through to the stores — counters, the source
         // name, the equalizer. Nested ObservableObjects do not propagate on
@@ -359,6 +369,7 @@ final class NotchViewModel: ObservableObject {
         for target in Tab.allCases { stopBackground(of: target) }
         // Whatever was typed makes it to disk even when quitting mid-thought.
         notes.flush()
+        llm.flush()
     }
 
     /// A screenshot that arrived on its own — copied elsewhere, or synced

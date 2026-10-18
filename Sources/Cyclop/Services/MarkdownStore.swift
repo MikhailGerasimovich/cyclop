@@ -30,6 +30,9 @@ struct MarkdownDocument: Identifiable, Equatable {
 final class MarkdownStore: ObservableObject {
     enum Setup: Equatable {
         case missing
+        /// Installed by an older `install.sh`, without what this build needs —
+        /// the provider SDKs and the OCR plugin. Same button, different words.
+        case outdated
         case installing
         case ready
         case failed(String)
@@ -57,7 +60,14 @@ final class MarkdownStore: ObservableObject {
     @Published private(set) var queue: [Source] = []
     /// Why the last conversion did not produce a file. Cleared by the next one.
     @Published private(set) var failure: String?
+    /// What went wrong without stopping the conversion — the model refusing a
+    /// key, say. The file is there, only without what the model would have
+    /// added, and this says why.
+    @Published private(set) var notice: String?
     @Published var link = ""
+
+    let llm: LLMSettings
+    let ledger: TokenLedger
 
     private var worker: Task<Void, Never>?
     private var installer: Task<Void, Never>?
@@ -68,9 +78,19 @@ final class MarkdownStore: ObservableObject {
     /// Written by `install.sh` as its very last step, so an install that died
     /// halfway does not pass for a working one.
     private static let marker = environment.appendingPathComponent("venv/.cyclop-installed")
-    private static let scripts = Bundle.main.resourceURL?.appendingPathComponent("markitdown", isDirectory: true)
+    /// `bridge.py` and `install.sh` as `bundle.sh` lays them out.
+    static let bundledScripts = Bundle.main.resourceURL?.appendingPathComponent("markitdown", isDirectory: true)
+    /// Where this store looks for them — the bundle, unless a test says
+    /// otherwise: `swift test` runs without one.
+    private let scripts: URL?
+    /// `ENVIRONMENT` in `install.sh` that this build expects. The first
+    /// installs wrote an empty marker, which reads as 1.
+    private static let environmentVersion = 2
 
-    init() {
+    init(llm: LLMSettings, ledger: TokenLedger, scripts: URL? = MarkdownStore.bundledScripts) {
+        self.llm = llm
+        self.ledger = ledger
+        self.scripts = scripts
         refreshSetup()
     }
 
@@ -78,13 +98,18 @@ final class MarkdownStore: ObservableObject {
 
     func refreshSetup() {
         guard setup != .installing else { return }
-        setup = FileManager.default.fileExists(atPath: Self.marker.path) ? .ready : .missing
+        guard let contents = try? String(contentsOf: Self.marker, encoding: .utf8) else {
+            setup = .missing
+            return
+        }
+        let version = Int(contents.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 1
+        setup = version >= Self.environmentVersion ? .ready : .outdated
     }
 
-    var canInstall: Bool { Self.script("install.sh") != nil }
+    var canInstall: Bool { Self.script("install.sh", in: scripts) != nil }
 
     func install() {
-        guard setup != .installing, let script = Self.script("install.sh") else { return }
+        guard setup != .installing, let script = Self.script("install.sh", in: scripts) else { return }
         setup = .installing
         installer = Task {
             let result = await ChildProcess.run(
@@ -93,12 +118,14 @@ final class MarkdownStore: ObservableObject {
                 environment: Self.childEnvironment
             )
             installer = nil
-            if result.status == 0, FileManager.default.fileExists(atPath: Self.marker.path) {
-                setup = .ready
+            if result.status == 0 {
+                setup = .missing
+                refreshSetup()
             } else if !result.cancelled {
                 setup = .failed(Self.lastLines(of: result.errors) ?? localized("Installation failed"))
             } else {
                 setup = .missing
+                refreshSetup()
             }
         }
     }
@@ -145,9 +172,16 @@ final class MarkdownStore: ObservableObject {
     }
 
     /// To the Trash, like the screenshots: the user's own hand, kept reversible.
+    /// What the file cost stays in the total.
     func remove(_ document: MarkdownDocument) {
         try? FileManager.default.trashItem(at: document.url, resultingItemURL: nil)
         documents.removeAll { $0.id == document.id }
+        ledger.forget(document.url)
+    }
+
+    /// Tokens the model spent on this file; nil if it never reached a model.
+    func usage(for document: MarkdownDocument) -> TokenLedger.Entry? {
+        ledger.entry(for: document.url)
     }
 
     // MARK: - Converting
@@ -186,7 +220,10 @@ final class MarkdownStore: ObservableObject {
         worker?.cancel()
     }
 
-    func dismissFailure() { failure = nil }
+    func dismissFailure() {
+        failure = nil
+        notice = nil
+    }
 
     /// Everything that runs, stopped: the tab leaving the rail, or the app
     /// quitting. A Python process left behind would outlive both.
@@ -198,6 +235,7 @@ final class MarkdownStore: ObservableObject {
     private func enqueue(_ sources: [Source]) {
         guard !sources.isEmpty else { return }
         failure = nil
+        notice = nil
         queue.append(contentsOf: sources)
         guard worker == nil else { return }
         worker = Task { await drain() }
@@ -212,6 +250,10 @@ final class MarkdownStore: ObservableObject {
                 documents.insert(document, at: 0)
             } catch is CancellationError {
                 break
+            } catch let error as Failure {
+                var message = "\(source.displayName): \(error.message)"
+                if let usage = error.usage { message += " · " + Self.tokens(usage.total) }
+                failure = message
             } catch {
                 failure = "\(source.displayName): \(error.localizedDescription)"
             }
@@ -224,7 +266,7 @@ final class MarkdownStore: ObservableObject {
     }
 
     private func run(_ source: Source) async throws -> MarkdownDocument {
-        guard setup == .ready, let bridge = Self.script("bridge.py") else {
+        guard setup == .ready, let bridge = Self.script("bridge.py", in: scripts) else {
             throw Failure(localized("The converter is not installed"))
         }
 
@@ -234,18 +276,49 @@ final class MarkdownStore: ObservableObject {
         case .link(let link): argument = link
         }
 
+        // Read now, for the whole run: settings edited while a long document
+        // is converting apply to the next one, not halfway through this.
+        llm.loadKey()
+        let model = llm.environment
+        let provider = llm.provider
+        var environment = Self.childEnvironment
+        if let model { environment.merge(model) { _, new in new } }
+
         let result = await ChildProcess.run(
             Self.python,
             ["-I", bridge.path, "--language", Self.speechLanguage, argument],
-            environment: Self.childEnvironment
+            environment: environment
         )
-        if result.cancelled { throw CancellationError() }
 
         let reply = try? JSONDecoder().decode(Reply.self, from: result.output)
-        if let error = reply?.error { throw Failure(error) }
-        guard result.status == 0, var markdown = reply?.markdown else {
-            throw Failure(Self.lastLines(of: result.errors) ?? localized("The converter stopped unexpectedly"))
+        let usage = reply?.usage.map {
+            TokenUsage(requests: $0.requests, input: $0.inputTokens, output: $0.outputTokens)
         }
+        // Recorded exactly once, however this ends: the tokens were spent
+        // whether or not a file comes out of it, and a cancel that lands
+        // after the model answered was paid for too. Only a written file
+        // gets the figure on its card; everything else goes to the total.
+        var written: URL?
+        defer {
+            if let usage {
+                ledger.record(
+                    usage,
+                    model: model?["CYCLOP_LLM_MODEL"] ?? "",
+                    provider: provider.rawValue,
+                    document: written
+                )
+            }
+        }
+
+        if result.cancelled { throw CancellationError() }
+        if let error = reply?.error { throw Failure(error, usage: usage) }
+        guard result.status == 0, var markdown = reply?.markdown else {
+            throw Failure(
+                Self.lastLines(of: result.errors) ?? localized("The converter stopped unexpectedly"),
+                usage: usage
+            )
+        }
+        notice = reply?.warnings.flatMap { Self.describe($0) }
 
         // markitdown reads the text inside a document, not the text in a
         // picture of one: without a model to ask it gives a photo's metadata
@@ -256,13 +329,14 @@ final class MarkdownStore: ObservableObject {
         try Task.checkCancellation()
 
         let trimmed = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { throw Failure(localized("No text found")) }
+        guard !trimmed.isEmpty else { throw Failure(localized("No text found"), usage: usage) }
 
         let url = Self.destination(for: Self.baseName(title: reply?.title, source: source))
         do {
             try (trimmed + "\n").write(to: url, atomically: true, encoding: .utf8)
+            written = url
         } catch {
-            throw Failure(error.localizedDescription)
+            throw Failure(error.localizedDescription, usage: usage)
         }
         let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
         return MarkdownDocument(url: url, date: Date(), size: size)
@@ -271,18 +345,83 @@ final class MarkdownStore: ObservableObject {
     // MARK: - Helpers
 
     private struct Reply: Decodable {
+        struct Usage: Decodable {
+            let requests: Int
+            let inputTokens: Int
+            let outputTokens: Int
+
+            enum CodingKeys: String, CodingKey {
+                case requests
+                case inputTokens = "input_tokens"
+                case outputTokens = "output_tokens"
+            }
+        }
+
+        struct Warning: Decodable {
+            let code: String
+            let detail: String
+        }
+
         let title: String?
         let markdown: String?
         let error: String?
+        let usage: Usage?
+        let warnings: [Warning]?
+        let models: [String]?
     }
 
-    private struct Failure: LocalizedError {
+    struct Failure: LocalizedError {
         let message: String
-        init(_ message: String) { self.message = message }
+        let usage: TokenUsage?
+        init(_ message: String, usage: TokenUsage? = nil) {
+            self.message = message
+            self.usage = usage
+        }
         var errorDescription: String? { message }
     }
 
-    private static func script(_ name: String) -> URL? {
+    /// The bridge reports what went wrong with the model as codes, so the
+    /// sentence comes from this app's tables, in the panel's language.
+    private static func describe(_ warnings: [Reply.Warning]) -> String? {
+        let lines = warnings.map { warning -> String in
+            switch warning.code {
+            case "auth": return localized("AI: the API key was not accepted")
+            case "permission": return localized("AI: the key has no access to %@", warning.detail)
+            case "model": return localized("AI: model %@ not found", warning.detail)
+            case "rate": return localized("AI: rate limit reached, some pictures were skipped")
+            case "connection": return localized("AI: cannot reach %@", warning.detail)
+            case "refusal": return localized("AI: the model declined a picture")
+            default: return localized("AI: %@", warning.detail)
+            }
+        }
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
+    }
+
+    /// "1 840 tokens", in the panel's language and its digit grouping.
+    static func tokens(_ count: Int) -> String {
+        localized("%@ tokens", count.formatted(.number.locale(Locale(identifier: appLanguage))))
+    }
+
+    /// The models the provider offers, for the picker in Settings. Runs the
+    /// same bridge as a conversion, so the key is checked by the same SDK
+    /// that will use it.
+    static func listModels(
+        environment model: [String: String],
+        scripts: URL? = bundledScripts
+    ) async -> Result<[String], Failure> {
+        guard FileManager.default.fileExists(atPath: python.path), let bridge = script("bridge.py", in: scripts) else {
+            return .failure(Failure(localized("Install the Markdown converter first")))
+        }
+        var environment = childEnvironment
+        environment.merge(model) { _, new in new }
+        let result = await ChildProcess.run(python, ["-I", bridge.path, "--list-models"], environment: environment)
+        let reply = try? JSONDecoder().decode(Reply.self, from: result.output)
+        if let models = reply?.models { return .success(models) }
+        let message = reply?.error ?? lastLines(of: result.errors) ?? localized("The converter stopped unexpectedly")
+        return .failure(Failure(message))
+    }
+
+    private static func script(_ name: String, in scripts: URL?) -> URL? {
         guard let url = scripts?.appendingPathComponent(name),
               FileManager.default.fileExists(atPath: url.path) else { return nil }
         return url
@@ -293,6 +432,8 @@ final class MarkdownStore: ObservableObject {
     /// installed by Homebrew, neither on that list.
     private static var childEnvironment: [String: String] {
         var environment = ProcessInfo.processInfo.environment
+        // Only this store decides whether the bridge sees a model.
+        for key in environment.keys where key.hasPrefix("CYCLOP_LLM_") { environment[key] = nil }
         let extra = ["/opt/homebrew/bin", "/usr/local/bin"]
         let path = environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
         environment["PATH"] = (extra + [path]).joined(separator: ":")
