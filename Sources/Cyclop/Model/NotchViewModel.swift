@@ -4,7 +4,7 @@ import Combine
 @MainActor
 final class NotchViewModel: ObservableObject {
     enum Tab: String, CaseIterable, Identifiable {
-        case media, shelf, clipboard, snippets, calendar, translate, currency, notes, teleprompter, utilities, settings
+        case media, shelf, clipboard, snippets, calendar, translate, currency, notes, markdown, teleprompter, utilities, settings
         var id: String { rawValue }
 
         var symbol: String {
@@ -17,6 +17,7 @@ final class NotchViewModel: ObservableObject {
             case .translate: return "translate"
             case .currency: return "dollarsign.circle"
             case .notes: return "note.text"
+            case .markdown: return "arrow.down.doc"
             case .teleprompter: return "text.viewfinder"
             case .utilities: return "wrench.and.screwdriver.fill"
             case .settings: return "gearshape.fill"
@@ -33,6 +34,7 @@ final class NotchViewModel: ObservableObject {
             case .translate: return localized("Translate")
             case .currency: return localized("Currency")
             case .notes: return localized("Notes")
+            case .markdown: return localized("Markdown")
             case .teleprompter: return localized("Teleprompter")
             case .utilities: return localized("Utilities")
             case .settings: return localized("Settings")
@@ -42,7 +44,7 @@ final class NotchViewModel: ObservableObject {
         /// Tabs with a field in them. Landing on one hands it the keyboard, so
         /// that arriving and typing is a single move.
         var needsKeyboard: Bool {
-            self == .translate || self == .currency || self == .snippets || self == .notes
+            self == .translate || self == .currency || self == .snippets || self == .notes || self == .markdown
         }
 
         /// Tabs whose content needs more than the standard 208 pt.
@@ -68,12 +70,14 @@ final class NotchViewModel: ObservableObject {
         /// of that column, so they sit where the pointer lands first. The rare
         /// modes — the converter, the teleprompter — come after them, by the
         /// rule from #43 that the rail is ordered by how often a tab is
-        /// glanced at. Settings joins that column rather than the content
+        /// glanced at. The Markdown converter goes right under the notes: it
+        /// is a working tool like them, reached for in the middle of a task
+        /// rather than once a month. Settings joins that column rather than the content
         /// rail: it is not something to hover past on the way to a track or a
         /// calendar, so it sits last, furthest from the tabs people actually
         /// rest on.
         static let leftRail: [Tab] = [.media, .shelf, .clipboard, .snippets, .calendar, .translate]
-        static let rightRail: [Tab] = [.notes, .currency, .teleprompter, .utilities, .settings]
+        static let rightRail: [Tab] = [.notes, .markdown, .currency, .teleprompter, .utilities, .settings]
     }
 
     /// What every screen's panel adds up to, kept by `NotchController`: this
@@ -151,7 +155,7 @@ final class NotchViewModel: ObservableObject {
             screenshotFolder.resumeIfEnabled()
         case .currency:
             currencies.start()
-        case .snippets, .translate, .notes, .teleprompter, .utilities, .settings:
+        case .snippets, .translate, .notes, .markdown, .teleprompter, .utilities, .settings:
             break
         }
     }
@@ -166,6 +170,9 @@ final class NotchViewModel: ObservableObject {
         // Taking the tab off the rail with the screen still covered would
         // leave the tap installed and no way back to it.
         case .utilities: keyboardLock.unlock()
+        // A conversion is a Python process; one left running for a tab that
+        // is gone would be working for nobody.
+        case .markdown: markdown.stop()
         case .snippets, .translate, .notes, .teleprompter, .settings: break
         }
     }
@@ -211,6 +218,10 @@ final class NotchViewModel: ObservableObject {
             // Rates update on a timer already; opening the tab asks once more
             // so a stale cache from the last few hours does not sit there.
             if tab == .currency { currencies.refreshIfNeeded() }
+            // The converted files are the user's to rename and delete in
+            // Finder, and the converter may have been installed from the
+            // terminal since the last look.
+            if tab == .markdown { markdown.reload() }
             // Leaving the notes sweeps out the blank ones — they cost one
             // hover to recreate, and a trail of empty cards is the clutter a
             // scratchpad exists to avoid.
@@ -245,6 +256,7 @@ final class NotchViewModel: ObservableObject {
     let snippets: SnippetStore
     let notes: NoteStore
     let teleprompter: TeleprompterStore
+    let markdown: MarkdownStore
     /// Shared by every pane that shows something worth not showing.
     let privacy = PrivacyMode()
     /// Here rather than in the controller, which now rebuilds a window per
@@ -265,6 +277,7 @@ final class NotchViewModel: ObservableObject {
         self.snippets = SnippetStore()
         self.notes = NoteStore()
         self.teleprompter = TeleprompterStore()
+        self.markdown = MarkdownStore()
 
         // The panel header reads through to the stores — counters, the source
         // name, the equalizer. Nested ObservableObjects do not propagate on
@@ -370,10 +383,27 @@ final class NotchViewModel: ObservableObject {
     /// is the point, not a side effect to guard against. Refused when the
     /// shelf is off: a drop that lands nowhere visible is worse than one that
     /// bounces.
+    ///
+    /// The converter takes the drop instead when it is the tab on screen:
+    /// that is how a document reaches it, and the panel opened on it, so the
+    /// user saw where the file was going before letting go.
     func accept(urls: [URL]) -> Bool {
+        if dropGoesToMarkdown { return markdown.convert(files: urls) }
         guard isVisible(.shelf) else { return false }
         shelf.add(urls)
         tab = .shelf
         return true
+    }
+
+    /// Whether a drag arriving now is headed for the converter. Asked when
+    /// the drag enters, so the panel opens on the tab that will take it.
+    var dropGoesToMarkdown: Bool { tab == .markdown && isVisible(.markdown) }
+
+    /// Files from the shelf, sent to the converter from a card's menu — the
+    /// way to convert something that was dropped on the shelf first.
+    func convertToMarkdown(_ urls: [URL]) {
+        guard isVisible(.markdown) else { return }
+        markdown.convert(files: urls)
+        tab = .markdown
     }
 }

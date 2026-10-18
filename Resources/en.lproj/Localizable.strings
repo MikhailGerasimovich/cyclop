@@ -138,3 +138,25 @@
 "Keyboard and trackpad are locked" = "Keyboard and trackpad are locked";
 "Hold Esc or − for %d s" = "Hold Esc or − for %d s";
 "Unlocks by itself in %d s" = "Unlocks by itself in %d s";
+
+/* Markdown: documents and links converted by markitdown. */
+"Markdown" = "Markdown";
+"Paste a link: a page, a YouTube video…" = "Paste a link: a page, a YouTube video…";
+"Convert to Markdown" = "Convert to Markdown";
+"Converting %@…" = "Converting %@…";
+"Cancel" = "Cancel";
+"Drop a document here" = "Drop a document here";
+"PDF, Word, Excel, PowerPoint, EPUB, HTML, CSV, JSON, ZIP,\nimages with text, audio with speech" = "PDF, Word, Excel, PowerPoint, EPUB, HTML, CSV, JSON, ZIP,\nimages with text, audio with speech";
+"Install the Markdown converter" = "Install the Markdown converter";
+"markitdown runs on this Mac, in its own Python environment\nin Application Support. Needs uv or Python 3.10 or newer" = "markitdown runs on this Mac, in its own Python environment\nin Application Support. Needs uv or Python 3.10 or newer";
+"Run Tools/markitdown/install.sh from the repository" = "Run Tools/markitdown/install.sh from the repository";
+"Install" = "Install";
+"Installing markitdown…" = "Installing markitdown…";
+"A minute or two: a few hundred megabytes of Python packages" = "A minute or two: a few hundred megabytes of Python packages";
+"Installation failed" = "Installation failed";
+"This is not a link" = "This is not a link";
+"The converter is not installed" = "The converter is not installed";
+"The converter stopped unexpectedly" = "The converter stopped unexpectedly";
+"No text found" = "No text found";
+"Document" = "Document";
+"Recognized Text" = "Recognized Text";

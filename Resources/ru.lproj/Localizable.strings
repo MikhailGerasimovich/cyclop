@@ -137,3 +137,25 @@
 "Keyboard and trackpad are locked" = "Клавиатура и трекпад заблокированы";
 "Hold Esc or − for %d s" = "Держи Esc или − %d с";
 "Unlocks by itself in %d s" = "Само снимется через %d с";
+
+/* Markdown: документы и ссылки, переведённые в markdown через markitdown. */
+"Markdown" = "Markdown";
+"Paste a link: a page, a YouTube video…" = "Вставьте ссылку: страницу, видео на YouTube…";
+"Convert to Markdown" = "Превратить в Markdown";
+"Converting %@…" = "Превращаю %@…";
+"Cancel" = "Отменить";
+"Drop a document here" = "Перетащите сюда документ";
+"PDF, Word, Excel, PowerPoint, EPUB, HTML, CSV, JSON, ZIP,\nimages with text, audio with speech" = "PDF, Word, Excel, PowerPoint, EPUB, HTML, CSV, JSON, ZIP,\nкартинки с текстом, аудио с речью";
+"Install the Markdown converter" = "Установить конвертер в Markdown";
+"markitdown runs on this Mac, in its own Python environment\nin Application Support. Needs uv or Python 3.10 or newer" = "markitdown работает на этом Mac, в своём окружении Python\nв Application Support. Нужен uv или Python 3.10 и новее";
+"Run Tools/markitdown/install.sh from the repository" = "Запустите Tools/markitdown/install.sh из репозитория";
+"Install" = "Установить";
+"Installing markitdown…" = "Ставлю markitdown…";
+"A minute or two: a few hundred megabytes of Python packages" = "Минута-другая: несколько сотен мегабайт пакетов Python";
+"Installation failed" = "Установка не удалась";
+"This is not a link" = "Это не ссылка";
+"The converter is not installed" = "Конвертер не установлен";
+"The converter stopped unexpectedly" = "Конвертер неожиданно остановился";
+"No text found" = "Текста не нашлось";
+"Document" = "Документ";
+"Recognized Text" = "Распознанный текст";

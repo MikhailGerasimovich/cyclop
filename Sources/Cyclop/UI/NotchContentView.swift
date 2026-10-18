@@ -130,6 +130,8 @@ struct NotchContentView: View {
             CurrencyRateDate(currencies: vm.currencies)
         case .notes:
             NotesCounter(notes: vm.notes)
+        case .markdown:
+            MarkdownCounter(markdown: vm.markdown)
         case .teleprompter:
             EmptyView()
         case .utilities:
@@ -188,7 +190,11 @@ struct NotchContentView: View {
         case .media:
             MediaPane(media: vm.media)
         case .shelf:
-            ShelfPane(shelf: vm.shelf, isTargeted: panel.isDropTargeted)
+            ShelfPane(
+                shelf: vm.shelf,
+                isTargeted: panel.isDropTargeted,
+                convertToMarkdown: vm.isVisible(.markdown) ? { vm.convertToMarkdown($0) } : nil
+            )
         case .clipboard:
             ClipboardPane(clipboard: vm.clipboard, privacy: vm.privacy)
         case .calendar:
@@ -201,6 +207,8 @@ struct NotchContentView: View {
             CurrencyPane(currencies: vm.currencies, wantsKeyboard: $panel.wantsKeyboard)
         case .notes:
             NotesPane(notes: vm.notes, privacy: vm.privacy, wantsKeyboard: $panel.wantsKeyboard)
+        case .markdown:
+            MarkdownPane(markdown: vm.markdown, isTargeted: panel.isDropTargeted, wantsKeyboard: $panel.wantsKeyboard)
         case .teleprompter:
             TeleprompterPane(prompter: vm.teleprompter, wantsKeyboard: $panel.wantsKeyboard)
         case .utilities:
@@ -221,6 +229,20 @@ private struct NotesCounter: View {
     var body: some View {
         if !notes.notes.isEmpty {
             Text("\(notes.notes.count)")
+                .font(.system(size: 10, weight: .medium).monospacedDigit())
+                .foregroundStyle(Theme.tertiary)
+        }
+    }
+}
+
+/// Same reason as `NotesCounter`: the converter's link field is typed into,
+/// so its store is not forwarded through the view model.
+private struct MarkdownCounter: View {
+    @ObservedObject var markdown: MarkdownStore
+
+    var body: some View {
+        if !markdown.documents.isEmpty {
+            Text("\(markdown.documents.count)")
                 .font(.system(size: 10, weight: .medium).monospacedDigit())
                 .foregroundStyle(Theme.tertiary)
         }
