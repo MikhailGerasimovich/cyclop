@@ -139,7 +139,9 @@
 "Unlocks by itself in %d s" = "Само снимется через %d с";
 
 /* Не давать Mac уснуть */
+"Keep Awake" = "Не спать";
 "Keep Mac Awake" = "Не давать Mac уснуть";
+"Until I turn it off" = "Пока не выключу";
 "The screen won't dim or lock while you're away" = "Экран не погаснет и не заблокируется, пока тебя нет рядом";
 "Ends in %@" = "Выключится через %@";
 "On until you turn it off" = "Включено, пока не выключишь";

@@ -1,76 +1,9 @@
 import SwiftUI
 
-/// Two cards side by side. Still not a list: two system-wide modes, each one
-/// press away, read better as two big targets than as rows of small ones — and
-/// the pane is cheap to redo the day a third arrives.
+/// One button across the whole pane. Deliberately not a list of one: a row
+/// layout built for items that do not exist yet would have to be guessed now and
+/// redone later anyway, and redoing the inside of a pane is cheap.
 struct UtilitiesPane: View {
-    @ObservedObject var lock: KeyboardLock
-    @ObservedObject var awake: KeepAwake
-
-    var body: some View {
-        HStack(spacing: 10) {
-            KeyboardLockCard(lock: lock)
-            KeepAwakeCard(awake: awake)
-        }
-    }
-}
-
-// MARK: - Card chrome
-
-/// The rounded tile both cards stand on. Lit with the accent while its mode is
-/// on, so which of the two is running reads from across the room.
-private struct UtilityCard<Content: View>: View {
-    var isOn = false
-    @ViewBuilder var content: Content
-
-    private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-    }
-
-    var body: some View {
-        content
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(shape.fill(isOn ? Color.accentColor.opacity(0.16) : Theme.surface))
-            .overlay(shape.strokeBorder(isOn ? Color.accentColor.opacity(0.45) : Theme.hairline, lineWidth: 1))
-            .animation(Theme.contentAnimation, value: isOn)
-    }
-}
-
-/// Icon, title, caption — the face of either card.
-private struct UtilityFace: View {
-    let symbol: String
-    var dimmed = false
-    let title: String
-    let caption: String
-
-    var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: symbol)
-                .font(.system(size: 24, weight: .light))
-                .foregroundStyle(dimmed ? Color.white.opacity(0.75) : .white)
-                .frame(height: 28)
-                .contentTransition(.symbolEffect(.replace))
-
-            Text(title)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-
-            Text(caption)
-                .font(.system(size: 10))
-                .foregroundStyle(Theme.tertiary)
-                .multilineTextAlignment(.center)
-                .lineLimit(4)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 12)
-        }
-    }
-}
-
-// MARK: - Keyboard lock
-
-private struct KeyboardLockCard: View {
     @ObservedObject var lock: KeyboardLock
 
     /// Read from the lock rather than kept here: one of the reasons — secure
@@ -86,14 +19,30 @@ private struct KeyboardLockCard: View {
         Button {
             press()
         } label: {
-            UtilityCard {
-                UtilityFace(
-                    symbol: reason == nil ? "keyboard" : "hand.raised.fill",
-                    dimmed: reason != nil,
-                    title: title,
-                    caption: caption
-                )
+            VStack(spacing: 8) {
+                Image(systemName: reason == nil ? "keyboard" : "hand.raised.fill")
+                    .font(.system(size: 26, weight: .light))
+                    .foregroundStyle(reason == nil ? .white : Color.white.opacity(0.75))
+
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white)
+
+                Text(caption)
+                    .font(.system(size: 10))
+                    .foregroundStyle(Theme.tertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Theme.surface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Theme.hairline, lineWidth: 1)
+            )
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -117,14 +66,7 @@ private struct KeyboardLockCard: View {
         }
     }
 
-    /// The captions were broken by hand for a card the width of the whole
-    /// pane. At half of it those breaks land mid-line, so they are let go and
-    /// the text wraps where it fits.
     private var caption: String {
-        rawCaption.replacingOccurrences(of: "\n", with: " ")
-    }
-
-    private var rawCaption: String {
         // A lock that ended is a different message from one that never started:
         // nothing is being asked of the user, something is being reported.
         if wasInterrupted {
@@ -160,99 +102,5 @@ private struct KeyboardLockCard: View {
 
         // The system dialog comes with the explanation, not before it.
         if lock.lock() == .noAccess { lock.requestAccess() }
-    }
-}
-
-// MARK: - Keep awake
-
-/// The face is the switch; the chips under it pick how long. A chip pressed
-/// while the mode is on restarts it from now with that preset, which is how a
-/// session is extended — so there is nothing else to learn.
-private struct KeepAwakeCard: View {
-    @ObservedObject var awake: KeepAwake
-
-    var body: some View {
-        UtilityCard(isOn: awake.isActive) {
-            VStack(spacing: 10) {
-                Button {
-                    awake.toggle()
-                } label: {
-                    // Ticks every second only while there is a countdown to
-                    // show; otherwise the face has nothing that changes.
-                    TimelineView(.periodic(from: .now, by: awake.endsAt == nil ? 3600 : 1)) { context in
-                        UtilityFace(
-                            symbol: awake.isActive ? "cup.and.saucer.fill" : "cup.and.saucer",
-                            dimmed: awake.failed,
-                            title: localized("Keep Mac Awake"),
-                            caption: caption(now: context.date)
-                        )
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-
-                HStack(spacing: 4) {
-                    ForEach(KeepAwake.Duration.allCases) { preset in
-                        DurationChip(
-                            label: KeepAwake.label(preset),
-                            isSelected: preset == awake.duration,
-                            isOn: awake.isActive
-                        ) {
-                            awake.start(preset)
-                        }
-                    }
-                }
-            }
-            .padding(.top, 12)
-            .padding(.bottom, 10)
-            .padding(.horizontal, 10)
-        }
-        .animation(Theme.contentAnimation, value: awake.isActive)
-    }
-
-    private func caption(now: Date) -> String {
-        if awake.failed {
-            return localized("macOS refused to keep the Mac awake. Press again to retry")
-        }
-        guard awake.isActive else {
-            return localized("The screen won't dim or lock while you're away")
-        }
-        if let left = awake.remaining(now: now) {
-            return localized("Ends in %@", KeepAwake.format(left))
-        }
-        return localized("On until you turn it off")
-    }
-}
-
-private struct DurationChip: View {
-    let label: String
-    let isSelected: Bool
-    let isOn: Bool
-    let action: () -> Void
-
-    @State private var hovering = false
-
-    private var fill: Color {
-        if isSelected { return isOn ? Color.accentColor : Theme.surfaceHover }
-        return hovering ? Theme.surfaceHover : Theme.surface
-    }
-
-    var body: some View {
-        Button(action: action) {
-            Text(label)
-                .font(.system(size: 10, weight: .medium).monospacedDigit())
-                .foregroundStyle(isSelected || hovering ? .white : Theme.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(maxWidth: .infinity)
-                .frame(height: 20)
-                .background(Capsule().fill(fill))
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .onHoverChange { hovering = $0 }
-        .animation(.easeOut(duration: 0.12), value: hovering)
-        .animation(Theme.contentAnimation, value: isSelected)
     }
 }

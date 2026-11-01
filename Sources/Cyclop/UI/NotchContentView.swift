@@ -134,6 +134,9 @@ struct NotchContentView: View {
             MarkdownCounter(markdown: vm.markdown, tokens: vm.tokens)
         case .teleprompter:
             EmptyView()
+        case .keepAwake:
+            // The pane says how long is left in a full sentence already.
+            EmptyView()
         case .utilities:
             EmptyView()
         case .settings:
@@ -211,8 +214,10 @@ struct NotchContentView: View {
             MarkdownPane(markdown: vm.markdown, isTargeted: panel.isDropTargeted, wantsKeyboard: $panel.wantsKeyboard)
         case .teleprompter:
             TeleprompterPane(prompter: vm.teleprompter, wantsKeyboard: $panel.wantsKeyboard)
+        case .keepAwake:
+            KeepAwakePane(awake: vm.keepAwake)
         case .utilities:
-            UtilitiesPane(lock: vm.keyboardLock, awake: vm.keepAwake)
+            UtilitiesPane(lock: vm.keyboardLock)
         case .settings:
             SettingsPane(vm: vm, shelf: vm.shelf, screenshots: vm.screenshotFolder, llm: vm.llm, tokens: vm.tokens)
         }
@@ -299,7 +304,7 @@ private struct Rail: View {
                 } label: {
                     Image(systemName: tab.symbol)
                         .font(.system(size: 12, weight: .medium))
-                        .frame(width: 30, height: panel.geometry.railIconHeight)
+                        .frame(width: 30, height: panel.geometry.railIconHeight(longestRail: max(vm.leftRail.count, vm.rightRail.count)))
                         .background(
                             RoundedRectangle(cornerRadius: 7, style: .continuous)
                                 .fill(fill(for: tab))

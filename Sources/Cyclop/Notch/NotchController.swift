@@ -90,8 +90,8 @@ final class NotchController {
     var keepAwake: KeepAwake? { vm?.keepAwake }
 
     /// Whether Keep Awake's tab is on the rail. Off, the menu hides its switch
-    /// too — the mode is a part of that tab, and a hidden tab runs nothing.
-    var isKeepAwakeAvailable: Bool { vm?.isVisible(.utilities) ?? false }
+    /// too — a hidden tab runs nothing.
+    var isKeepAwakeAvailable: Bool { vm?.isVisible(.keepAwake) ?? false }
 
     // MARK: - Displays
 

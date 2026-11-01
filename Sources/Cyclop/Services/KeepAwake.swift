@@ -131,12 +131,12 @@ final class KeepAwake: ObservableObject {
 
     // MARK: - Formatting
 
-    /// "42 min", "1 hr 5 min", "30 sec" — in the app's language, not the
+    /// "42 min", "1 hr, 5 min", "30 sec" — in the app's language, not the
     /// system's, like every other formatted value in the panel. Rounded up, so
     /// the last minute reads "1 min" rather than "0 min".
     static func format(_ interval: TimeInterval) -> String {
         let formatter = DateComponentsFormatter()
-        formatter.unitsStyle = .abbreviated
+        formatter.unitsStyle = .short
         var calendar = Calendar.current
         calendar.locale = Locale(identifier: appLanguage)
         formatter.calendar = calendar
@@ -148,9 +148,9 @@ final class KeepAwake: ObservableObject {
         return formatter.string(from: (interval / 60).rounded(.up) * 60) ?? ""
     }
 
-    /// The label on a preset chip.
+    /// The label on a preset.
     static func label(_ duration: Duration) -> String {
-        guard let interval = duration.interval else { return "∞" }
+        guard let interval = duration.interval else { return localized("Until I turn it off") }
         return format(interval)
     }
 }

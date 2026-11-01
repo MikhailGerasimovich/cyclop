@@ -4,7 +4,7 @@ import Combine
 @MainActor
 final class NotchViewModel: ObservableObject {
     enum Tab: String, CaseIterable, Identifiable {
-        case media, shelf, clipboard, snippets, calendar, translate, currency, notes, markdown, teleprompter, utilities, settings
+        case media, shelf, clipboard, snippets, calendar, translate, currency, notes, markdown, keepAwake, teleprompter, utilities, settings
         var id: String { rawValue }
 
         var symbol: String {
@@ -18,6 +18,7 @@ final class NotchViewModel: ObservableObject {
             case .currency: return "dollarsign.circle"
             case .notes: return "note.text"
             case .markdown: return "arrow.down.doc"
+            case .keepAwake: return "cup.and.saucer.fill"
             case .teleprompter: return "text.viewfinder"
             case .utilities: return "wrench.and.screwdriver.fill"
             case .settings: return "gearshape.fill"
@@ -35,6 +36,7 @@ final class NotchViewModel: ObservableObject {
             case .currency: return localized("Currency")
             case .notes: return localized("Notes")
             case .markdown: return localized("Markdown")
+            case .keepAwake: return localized("Keep Awake")
             case .teleprompter: return localized("Teleprompter")
             case .utilities: return localized("Utilities")
             case .settings: return localized("Settings")
@@ -72,12 +74,14 @@ final class NotchViewModel: ObservableObject {
         /// rule from #43 that the rail is ordered by how often a tab is
         /// glanced at. The Markdown converter goes right under the notes: it
         /// is a working tool like them, reached for in the middle of a task
-        /// rather than once a month. Settings joins that column rather than the content
+        /// rather than once a month. Keep Awake follows them: it is flipped on
+        /// the way out to a call or a coffee, far more often than the modes
+        /// below it. Settings joins that column rather than the content
         /// rail: it is not something to hover past on the way to a track or a
         /// calendar, so it sits last, furthest from the tabs people actually
         /// rest on.
         static let leftRail: [Tab] = [.media, .shelf, .clipboard, .snippets, .calendar, .translate]
-        static let rightRail: [Tab] = [.notes, .markdown, .currency, .teleprompter, .utilities, .settings]
+        static let rightRail: [Tab] = [.notes, .markdown, .keepAwake, .currency, .teleprompter, .utilities, .settings]
     }
 
     /// What every screen's panel adds up to, kept by `NotchController`: this
@@ -155,7 +159,7 @@ final class NotchViewModel: ObservableObject {
             screenshotFolder.resumeIfEnabled()
         case .currency:
             currencies.start()
-        case .snippets, .translate, .notes, .markdown, .teleprompter, .utilities, .settings:
+        case .snippets, .translate, .notes, .markdown, .keepAwake, .teleprompter, .utilities, .settings:
             break
         }
     }
@@ -168,12 +172,11 @@ final class NotchViewModel: ObservableObject {
         case .shelf: screenshotFolder.stop()
         case .currency: currencies.stop()
         // Taking the tab off the rail with the screen still covered would
-        // leave the tap installed and no way back to it. Keep Awake goes with
-        // it for the reason every hidden tab stops: a mode whose switch is
-        // nowhere to be seen must not keep running — here, keep the Mac up.
-        case .utilities:
-            keyboardLock.unlock()
-            keepAwake.stop()
+        // leave the tap installed and no way back to it.
+        case .utilities: keyboardLock.unlock()
+        // A mode whose switch is nowhere to be seen must not keep running —
+        // here, keep the Mac up past its owner's energy settings.
+        case .keepAwake: keepAwake.stop()
         // A conversion is a Python process; one left running for a tab that
         // is gone would be working for nobody.
         case .markdown: markdown.stop()

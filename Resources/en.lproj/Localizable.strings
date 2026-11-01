@@ -140,7 +140,9 @@
 "Unlocks by itself in %d s" = "Unlocks by itself in %d s";
 
 /* Keep Awake */
+"Keep Awake" = "Keep Awake";
 "Keep Mac Awake" = "Keep Mac Awake";
+"Until I turn it off" = "Until I turn it off";
 "The screen won't dim or lock while you're away" = "The screen won't dim or lock while you're away";
 "Ends in %@" = "Ends in %@";
 "On until you turn it off" = "On until you turn it off";

@@ -121,6 +121,6 @@ struct KeepAwakeTests {
     @Test func remainingTimeRoundsUp() {
         #expect(KeepAwake.format(59 * 60 + 1) == KeepAwake.format(60 * 60))
         #expect(KeepAwake.format(0.2) == KeepAwake.format(1))
-        #expect(KeepAwake.label(.indefinite) == "∞")
+        #expect(KeepAwake.label(.indefinite) == localized("Until I turn it off"))
     }
 }
