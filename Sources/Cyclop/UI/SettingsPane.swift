@@ -10,6 +10,8 @@ struct SettingsPane: View {
     @ObservedObject var vm: NotchViewModel
     @ObservedObject var shelf: ShelfStore
     let screenshots: ScreenshotFolderWatcher
+    @ObservedObject var llm: LLMSettings
+    @ObservedObject var tokens: TokenLedger
     @ObservedObject private var config = ConfigStore.shared
 
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -50,6 +52,8 @@ struct SettingsPane: View {
                         }
                     }
                 }
+
+                aiSection
 
                 section(localized("Displays")) {
                     toggleRow(
@@ -137,7 +141,189 @@ struct SettingsPane: View {
             fullSizeNotch = NotchGeometry.drawsFullSizeNotch
             watchScreenshotFolder = screenshots.isEnabled
             refreshUsage()
+            // The one place the key is shown, so the one place it is fetched
+            // from the Keychain without a conversion asking for it.
+            llm.loadKey()
         }
+    }
+
+    // MARK: - AI
+
+    /// The Markdown converter's language model. The switch is first and wins
+    /// over everything under it: a key that has been typed in turns nothing
+    /// on by itself.
+    private var aiSection: some View {
+        section(localized("AI")) {
+            toggleRow(symbol: "sparkles", title: localized("Process with AI"), isOn: $llm.enabled)
+
+            row(symbol: "server.rack", title: localized("Provider")) {
+                Menu {
+                    ForEach(LLMProvider.allCases) { provider in
+                        Button(provider.title) { llm.provider = provider }
+                    }
+                } label: {
+                    Text(llm.provider.title)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.visible)
+                .fixedSize()
+                Spacer(minLength: 0)
+            }
+
+            row(symbol: "link", title: localized("API Address")) {
+                field(TextField(llm.provider.defaultBaseURL.isEmpty ? "https://…/v1" : llm.provider.defaultBaseURL, text: $llm.baseURL))
+            }
+
+            row(symbol: "key.fill", title: localized("API Key")) {
+                field(SecureField(llm.provider.needsKey ? localized("Required") : localized("Not needed"), text: $llm.apiKey))
+            }
+
+            row(symbol: "cpu", title: localized("Model")) {
+                field(TextField(localized("Model name"), text: $llm.model))
+                modelPicker
+            }
+
+            if let problem = llm.problem {
+                noteRow(symbol: "exclamationmark.triangle.fill", tint: Color.yellow.opacity(0.85), text: problem)
+            } else if let error = llm.modelsError {
+                noteRow(symbol: "exclamationmark.triangle.fill", tint: Color.yellow.opacity(0.85), text: error)
+            }
+
+            usageRow
+
+            noteRow(
+                symbol: "info.circle",
+                tint: Theme.tertiary,
+                text: llm.provider.isLocal
+                    ? localized("Describes pictures and reads text in images inside PDF, Word, PowerPoint and Excel. The model runs on this Mac: nothing is sent anywhere")
+                    : localized("Describes pictures and reads text in images inside PDF, Word, PowerPoint and Excel. Every picture is one paid request; the pictures are sent to the provider")
+            )
+        }
+    }
+
+    /// The provider's own list, fetched on demand: the clouds change their
+    /// line-ups faster than a list written here would be kept up to date, and
+    /// a local server has whatever was pulled onto it.
+    @ViewBuilder
+    private var modelPicker: some View {
+        if llm.isLoadingModels {
+            ProgressView()
+                .controlSize(.mini)
+                .frame(width: 18)
+        } else if llm.models.isEmpty {
+            Button { llm.loadModels() } label: {
+                Image(systemName: "arrow.down.circle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(localized("Load the provider's models"))
+        } else {
+            Menu {
+                ForEach(llm.models, id: \.self) { model in
+                    Button(model) { llm.model = model }
+                }
+                Divider()
+                Button(localized("Reload List")) { llm.loadModels() }
+            } label: {
+                Image(systemName: "list.bullet")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help(localized("Choose a model"))
+        }
+    }
+
+    private var usageRow: some View {
+        let locale = Locale(identifier: appLanguage)
+        let total = tokens.total
+        return HStack(alignment: .center, spacing: 8) {
+            Image(systemName: "chart.bar.fill")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.secondary)
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(localized("Tokens used: %@", total.total.formatted(.number.locale(locale))))
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(.white)
+                Text(localized(
+                    "Input %@ · output %@ · requests %d · since %@",
+                    total.input.formatted(.number.locale(locale)),
+                    total.output.formatted(.number.locale(locale)),
+                    total.requests,
+                    tokens.since.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(locale))
+                ))
+                .font(.system(size: 9).monospacedDigit())
+                .foregroundStyle(Theme.tertiary)
+            }
+            Spacer(minLength: 8)
+            Button(localized("Reset")) { tokens.resetTotal() }
+                .buttonStyle(.plain)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Theme.secondary)
+                .disabled(total.requests == 0)
+                .opacity(total.requests == 0 ? 0.4 : 1)
+        }
+        .padding(.horizontal, 8)
+        .frame(minHeight: 32)
+    }
+
+    private func row<Content: View>(
+        symbol: String,
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.secondary)
+                .frame(width: 16)
+            Text(title)
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 92, alignment: .leading)
+            content()
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 26)
+    }
+
+    /// The same look as the name field in Snippets: a field is told apart
+    /// from a label by the surface under it, the caret shows only once in.
+    private func field<Field: View>(_ field: Field) -> some View {
+        field
+            .textFieldStyle(.plain)
+            .font(.system(size: 11))
+            .foregroundStyle(.white)
+            .tint(Theme.secondary)
+            .padding(.horizontal, 7)
+            .frame(height: 20)
+            .background(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(Theme.surface)
+            )
+    }
+
+    private func noteRow(symbol: String, tint: Color, text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: symbol)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 16)
+                .padding(.top, 1)
+            Text(text)
+                .font(.system(size: 10))
+                .foregroundStyle(Theme.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
     }
 
     private var clearTitle: String {

@@ -101,9 +101,17 @@ final class NotchScreenPanel {
         root.addSubview(hosting)
 
         root.onDragEntered = { [weak self] in
+            guard let self else { return }
+            // The Markdown converter, when it was the tab left on screen, keeps
+            // the drop: a document dragged to the notch is how it gets one.
+            if vm.dropGoesToMarkdown {
+                state.isDropTargeted = true
+                setOpen(true)
+                return
+            }
             // A shelf that is switched off is not a drop target: the panel
             // does not open for a file it has nowhere to show.
-            guard let self, vm.isVisible(.shelf) else { return }
+            guard vm.isVisible(.shelf) else { return }
             state.select(.shelf)
             state.isDropTargeted = true
             setOpen(true)

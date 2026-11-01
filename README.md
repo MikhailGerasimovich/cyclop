@@ -35,6 +35,7 @@ that works is below.
 | **Currency** | An amount on one side, the other currency on the other; type into either. Rates are the one thing in Cyclop that comes over the network — a public table of daily rates, fetched once an hour, and only while the tab is on |
 | **Teleprompter** | A script that scrolls under the camera at a speed you set. The notch is the one place on the screen a teleprompter belongs: reading happens right beside the lens, so on the recording the eyes stay on the camera instead of travelling to a window below it. The panel holds itself open while the text is moving — reading a script means not touching the trackpad |
 | **Notes** | Scratch, on the right rail of icons: jot something down, come back, delete it or carry it off through the clipboard. Hovering lands with the caret ready; blank notes sweep themselves out |
+| **Markdown** | Documents and links turned into Markdown by Microsoft's [markitdown](https://github.com/microsoft/markitdown). Paste a link — a page, a YouTube video (its transcript) — and press Return; or, with this tab on screen, drop a file onto the notch: PDF, Word, Excel, PowerPoint, EPUB, HTML, CSV, JSON, ZIP, images, audio. Text in pictures and scanned PDFs is read by macOS's own Vision, offline; speech in audio is transcribed. Each result is a card: drag it out as an `.md` file or copy the text with the button. A file already on the shelf goes through its menu, "Convert to Markdown" |
 
 The panel opens when the pointer reaches the notch and collapses when it leaves.
 Tabs switch on hover as well — but only if the pointer has come to rest on the
@@ -73,6 +74,30 @@ The icon is generated in code, with no graphics editor involved:
 ```bash
 swift Scripts/make-icon.swift "$PWD/Resources/AppIcon.icns"
 ```
+
+The Markdown tab runs markitdown in a Python environment of its own, in
+`~/Library/Application Support/Cyclop/MarkItDown` — a few hundred megabytes
+that stay out of the bundle. The tab installs it with a button; the same thing
+from the terminal, from PyPI or from a local clone:
+
+```bash
+Tools/markitdown/install.sh                 # needs uv (brew install uv) or Python 3.10+
+Tools/markitdown/install.sh ../markitdown   # from a clone of microsoft/markitdown
+brew install exiftool ffmpeg                # optional: image/audio metadata, mp3 and m4a speech
+```
+
+**AI processing** is optional and off by default: Settings → AI. With it on,
+a language model describes pictures and reads the text in images inside PDF,
+Word, PowerPoint and Excel, and in scanned pages. The provider is a choice —
+Anthropic (Claude, through the official SDK), OpenAI, Google Gemini,
+OpenRouter, a local Ollama or LM Studio, or any other OpenAI-compatible
+address — along with the model (the list comes from the provider itself),
+the API address and the key. The key is kept in the Keychain, everything else
+in `config.json`; the switch wins over all of it, so a stored key turns
+nothing on by itself. Each picture or page is one request. Every card shows
+what its conversion spent, if it called the model at all, and the total since
+the last reset is in Settings and in the tab's header
+(`~/Library/Application Support/Cyclop/llm-usage.json`).
 
 ## Installation
 

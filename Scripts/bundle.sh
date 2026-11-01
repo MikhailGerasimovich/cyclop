@@ -65,6 +65,14 @@ for lproj in "$ROOT"/Resources/*.lproj; do
     echo "    $(basename "$lproj")"
 done
 
+# Мост к markitdown и его установщик. Сам markitdown в бандл не входит — это
+# сотни мегабайт Python, — его ставит install.sh, по кнопке во вкладке
+# «Markdown» или из терминала. См. MarkdownStore.swift.
+echo "==> markitdown bridge"
+mkdir -p "$APP/Contents/Resources/markitdown"
+cp "$ROOT/Tools/markitdown/bridge.py" "$ROOT/Tools/markitdown/install.sh" \
+    "$APP/Contents/Resources/markitdown/"
+
 # Now Playing helper. Built here rather than by SwiftPM because it is not linked
 # into the app: it is loaded into /usr/bin/perl at runtime. See helper.m.
 echo "==> building Now Playing helper"

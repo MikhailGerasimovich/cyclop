@@ -130,6 +130,8 @@ struct NotchContentView: View {
             CurrencyRateDate(currencies: vm.currencies)
         case .notes:
             NotesCounter(notes: vm.notes)
+        case .markdown:
+            MarkdownCounter(markdown: vm.markdown, tokens: vm.tokens)
         case .teleprompter:
             EmptyView()
         case .utilities:
@@ -188,7 +190,11 @@ struct NotchContentView: View {
         case .media:
             MediaPane(media: vm.media)
         case .shelf:
-            ShelfPane(shelf: vm.shelf, isTargeted: panel.isDropTargeted)
+            ShelfPane(
+                shelf: vm.shelf,
+                isTargeted: panel.isDropTargeted,
+                convertToMarkdown: vm.isVisible(.markdown) ? { vm.convertToMarkdown($0) } : nil
+            )
         case .clipboard:
             ClipboardPane(clipboard: vm.clipboard, privacy: vm.privacy)
         case .calendar:
@@ -201,12 +207,14 @@ struct NotchContentView: View {
             CurrencyPane(currencies: vm.currencies, wantsKeyboard: $panel.wantsKeyboard)
         case .notes:
             NotesPane(notes: vm.notes, privacy: vm.privacy, wantsKeyboard: $panel.wantsKeyboard)
+        case .markdown:
+            MarkdownPane(markdown: vm.markdown, isTargeted: panel.isDropTargeted, wantsKeyboard: $panel.wantsKeyboard)
         case .teleprompter:
             TeleprompterPane(prompter: vm.teleprompter, wantsKeyboard: $panel.wantsKeyboard)
         case .utilities:
             UtilitiesPane(lock: vm.keyboardLock)
         case .settings:
-            SettingsPane(vm: vm, shelf: vm.shelf, screenshots: vm.screenshotFolder)
+            SettingsPane(vm: vm, shelf: vm.shelf, screenshots: vm.screenshotFolder, llm: vm.llm, tokens: vm.tokens)
         }
     }
 }
@@ -224,6 +232,28 @@ private struct NotesCounter: View {
                 .font(.system(size: 10, weight: .medium).monospacedDigit())
                 .foregroundStyle(Theme.tertiary)
         }
+    }
+}
+
+/// Same reason as `NotesCounter`: the converter's link field is typed into,
+/// so its store is not forwarded through the view model.
+/// The total spent on the model sits next to the count once there is one —
+/// the per-file figures are on the cards, the sum of everything is here.
+private struct MarkdownCounter: View {
+    @ObservedObject var markdown: MarkdownStore
+    @ObservedObject var tokens: TokenLedger
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if tokens.total.requests > 0 {
+                Text(MarkdownStore.tokens(tokens.total.total))
+            }
+            if !markdown.documents.isEmpty {
+                Text("\(markdown.documents.count)")
+            }
+        }
+        .font(.system(size: 10, weight: .medium).monospacedDigit())
+        .foregroundStyle(Theme.tertiary)
     }
 }
 

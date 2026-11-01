@@ -3,6 +3,9 @@ import SwiftUI
 struct ShelfPane: View {
     @ObservedObject var shelf: ShelfStore
     var isTargeted: Bool
+    /// Hands files to the Markdown converter; nil while that tab is off, and
+    /// the menu item goes with it.
+    var convertToMarkdown: (([URL]) -> Void)?
 
     /// Which card the pointer is over — decided by the pane, not by the cards.
     ///
@@ -27,7 +30,12 @@ struct ShelfPane: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         ForEach(shelf.items) { item in
-                            ShelfCard(item: item, shelf: shelf, isHovered: hoveredID == item.id)
+                            ShelfCard(
+                                item: item,
+                                shelf: shelf,
+                                isHovered: hoveredID == item.id,
+                                convertToMarkdown: convertToMarkdown
+                            )
                                 .background(
                                     GeometryReader { geo in
                                         Color.clear.preference(
@@ -125,6 +133,7 @@ private struct ShelfCard: View {
     /// Handed down from the pane, which is the one place that can know it
     /// correctly when cards move under a stationary pointer.
     let isHovered: Bool
+    let convertToMarkdown: (([URL]) -> Void)?
 
     private var isSelected: Bool { shelf.isSelected(item) }
 
@@ -192,6 +201,11 @@ private struct ShelfCard: View {
             Button("Copy") { shelf.copy(item) }
             Button("Open") { shelf.open(item) }
             Button("Show in Finder") { shelf.reveal(item) }
+            if let convertToMarkdown {
+                // The whole selection when this card is part of it, the same
+                // rule a drag follows.
+                Button("Convert to Markdown") { convertToMarkdown(shelf.dragURLs(startingAt: item)) }
+            }
             Divider()
             Button("Remove from Shelf") { shelf.remove(item) }
         }
