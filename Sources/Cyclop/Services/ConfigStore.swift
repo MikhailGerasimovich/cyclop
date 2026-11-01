@@ -73,6 +73,7 @@ final class ConfigStore: ObservableObject {
         var hiddenTabs: [String] = []
         var fullSizeDrawnNotch = false
         var ai = AI()
+        var keepAwakeMinutes = KeepAwake.Duration.fallback.rawValue
 
         init() {}
 
@@ -91,6 +92,7 @@ final class ConfigStore: ObservableObject {
             hiddenTabs = try c.decodeIfPresent([String].self, forKey: .hiddenTabs) ?? d.hiddenTabs
             fullSizeDrawnNotch = try c.decodeIfPresent(Bool.self, forKey: .fullSizeDrawnNotch) ?? d.fullSizeDrawnNotch
             ai = try c.decodeIfPresent(AI.self, forKey: .ai) ?? d.ai
+            keepAwakeMinutes = try c.decodeIfPresent(Int.self, forKey: .keepAwakeMinutes) ?? d.keepAwakeMinutes
         }
     }
 
@@ -177,6 +179,19 @@ final class ConfigStore: ObservableObject {
     var ai: AI {
         get { value.ai }
         set { value.ai = newValue; persist() }
+    }
+
+    /// The preset Keep Awake starts with, in minutes; 0 is "until switched
+    /// off". A plain number rather than `KeepAwake.Duration`, for the same
+    /// reason `hiddenTabs` is strings — and a value no preset matches any more
+    /// falls back there, not here.
+    var keepAwakeMinutes: Int {
+        get { value.keepAwakeMinutes }
+        set {
+            guard newValue != value.keepAwakeMinutes else { return }
+            value.keepAwakeMinutes = newValue
+            persist()
+        }
     }
 
     // MARK: - Migration
