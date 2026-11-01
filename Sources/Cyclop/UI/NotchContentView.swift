@@ -212,7 +212,7 @@ struct NotchContentView: View {
         case .teleprompter:
             TeleprompterPane(prompter: vm.teleprompter, wantsKeyboard: $panel.wantsKeyboard)
         case .utilities:
-            UtilitiesPane(lock: vm.keyboardLock)
+            UtilitiesPane(lock: vm.keyboardLock, awake: vm.keepAwake)
         case .settings:
             SettingsPane(vm: vm, shelf: vm.shelf, screenshots: vm.screenshotFolder, llm: vm.llm, tokens: vm.tokens)
         }

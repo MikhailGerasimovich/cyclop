@@ -139,6 +139,14 @@
 "Hold Esc or − for %d s" = "Hold Esc or − for %d s";
 "Unlocks by itself in %d s" = "Unlocks by itself in %d s";
 
+/* Keep Awake */
+"Keep Mac Awake" = "Keep Mac Awake";
+"The screen won't dim or lock while you're away" = "The screen won't dim or lock while you're away";
+"Ends in %@" = "Ends in %@";
+"On until you turn it off" = "On until you turn it off";
+"macOS refused to keep the Mac awake. Press again to retry" = "macOS refused to keep the Mac awake. Press again to retry";
+"Cyclop — Keep Mac Awake is on" = "Cyclop — Keep Mac Awake is on";
+
 /* Markdown: documents and links converted by markitdown. */
 "Markdown" = "Markdown";
 "Paste a link: a page, a YouTube video…" = "Paste a link: a page, a YouTube video…";

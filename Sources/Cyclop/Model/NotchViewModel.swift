@@ -168,8 +168,12 @@ final class NotchViewModel: ObservableObject {
         case .shelf: screenshotFolder.stop()
         case .currency: currencies.stop()
         // Taking the tab off the rail with the screen still covered would
-        // leave the tap installed and no way back to it.
-        case .utilities: keyboardLock.unlock()
+        // leave the tap installed and no way back to it. Keep Awake goes with
+        // it for the reason every hidden tab stops: a mode whose switch is
+        // nowhere to be seen must not keep running — here, keep the Mac up.
+        case .utilities:
+            keyboardLock.unlock()
+            keepAwake.stop()
         // A conversion is a Python process; one left running for a tab that
         // is gone would be working for nobody.
         case .markdown: markdown.stop()
@@ -273,6 +277,12 @@ final class NotchViewModel: ObservableObject {
     /// display: the lock is a system-wide mode and must outlive plugging a
     /// monitor in mid-wipe. The model is what survives a reconfiguration.
     let keyboardLock = KeyboardLock()
+    /// Same reasoning as the lock: a system-wide mode, so it lives with the
+    /// model and outlives a monitor being plugged in.
+    let keepAwake = KeepAwake(
+        duration: KeepAwake.Duration(rawValue: ConfigStore.shared.keepAwakeMinutes) ?? .fallback,
+        remember: { ConfigStore.shared.keepAwakeMinutes = $0.rawValue }
+    )
 
     private var cancellables = Set<AnyCancellable>()
 

@@ -36,6 +36,7 @@ that works is below.
 | **Teleprompter** | A script that scrolls under the camera at a speed you set. The notch is the one place on the screen a teleprompter belongs: reading happens right beside the lens, so on the recording the eyes stay on the camera instead of travelling to a window below it. The panel holds itself open while the text is moving — reading a script means not touching the trackpad |
 | **Notes** | Scratch, on the right rail of icons: jot something down, come back, delete it or carry it off through the clipboard. Hovering lands with the caret ready; blank notes sweep themselves out |
 | **Markdown** | Documents and links turned into Markdown by Microsoft's [markitdown](https://github.com/microsoft/markitdown). Paste a link — a page, a YouTube video (its transcript) — and press Return; or, with this tab on screen, drop a file onto the notch: PDF, Word, Excel, PowerPoint, EPUB, HTML, CSV, JSON, ZIP, images, audio. Text in pictures and scanned PDFs is read by macOS's own Vision, offline; speech in audio is transcribed. Each result is a card: drag it out as an `.md` file or copy the text with the button. A file already on the shelf goes through its menu, "Convert to Markdown" |
+| **Utilities** | Two system-wide switches. **Lock Keyboard** swallows every key and click while you wipe the keys and the screen. **Keep Mac Awake** stops the display from dimming and the screen from locking while you are away — for 15 minutes, an hour, three hours or until switched off; picking another preset while it runs restarts it from now. The same switch is in the menu bar, and the menu bar icon turns into a cup while it is on |
 
 The panel opens when the pointer reaches the notch and collapses when it leaves.
 Tabs switch on hover as well — but only if the pointer has come to rest on the
@@ -209,6 +210,10 @@ costs — eighteen notes on decisions the code does not show:
   what that needs: one Apple ID, Bluetooth and Wi-Fi on, Handoff enabled and the
   devices near each other. And it overwrites the clipboard on the Mac — what was
   overwritten stays in the Clipboard tab one click away.
+- Keep Mac Awake holds off idle sleep only. Closing the lid still puts a
+  MacBook to sleep, and locking the screen by hand still locks it — both on
+  purpose. Overriding the lid takes `pmset` and an administrator password, and
+  is not worth asking for here.
 - macOS does not preinstall translation languages — the first time, the pack has
   to be downloaded through System Settings; the panel says so and opens the right
   screen.
@@ -248,6 +253,8 @@ Sources/Cyclop
 │   ├── CurrencyStore.swift    rates over the network, the one tab that has any
 │   ├── TeleprompterStore.swift the script and where reading it has got to
 │   ├── ScreenshotFolderWatcher.swift  screenshots saved to disk, onto the shelf
+│   ├── KeyboardLock.swift     swallowing input while the keyboard is wiped
+│   ├── KeepAwake.swift        power assertions: no idle sleep, no screen lock
 │   └── CalendarStore.swift    EventKit: next meetings and the call link
 └── UI/                        NotchShape, tab panes, theme
 

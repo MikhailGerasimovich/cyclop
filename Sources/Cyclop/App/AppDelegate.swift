@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -7,11 +8,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var privacyItem: NSMenuItem?
     private var privacyAllItem: NSMenuItem?
     private var privacySectionItems: [PrivacyMode.Section: NSMenuItem] = [:]
+    private var keepAwakeItem: NSMenuItem?
+    private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller = NotchController()
         controller?.install()
         installStatusItem()
+        observeKeepAwake()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -90,6 +94,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(privacy)
         privacyItem = privacy
 
+        // The other switch people want without opening anything: it is
+        // usually flipped on the way out to a call or a coffee, with the
+        // pointer already up in the menu bar.
+        let awake = NSMenuItem(
+            title: localized("Keep Mac Awake"),
+            action: #selector(toggleKeepAwake),
+            keyEquivalent: ""
+        )
+        awake.target = self
+        menu.addItem(awake)
+        keepAwakeItem = awake
+
         menu.addItem(.separator())
         let quit = NSMenuItem(title: localized("Quit"), action: #selector(quit), keyEquivalent: "q")
         quit.target = self
@@ -107,6 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// between: a menu nobody is looking at deserves no bookkeeping.
     func menuWillOpen(_ menu: NSMenu) {
         refreshPrivacyItems()
+        refreshKeepAwakeItem()
     }
 
     @objc private func quit() {
@@ -128,6 +145,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
               let section = PrivacyMode.Section(rawValue: raw) else { return }
         privacy.setCovering(section, !privacy.covers(section))
         refreshPrivacyItems()
+    }
+
+    @objc private func toggleKeepAwake() {
+        controller?.keepAwake?.toggle()
+    }
+
+    /// A tick while on, and how long is left under the title — the same two
+    /// facts the card in Utilities shows.
+    private func refreshKeepAwakeItem() {
+        guard let item = keepAwakeItem else { return }
+        let available = controller?.isKeepAwakeAvailable ?? false
+        item.isHidden = !available
+        guard available, let awake = controller?.keepAwake else { return }
+        item.state = awake.isActive ? .on : .off
+        if !awake.isActive {
+            item.subtitle = nil
+        } else if let left = awake.remaining() {
+            item.subtitle = localized("Ends in %@", KeepAwake.format(left))
+        } else {
+            item.subtitle = localized("On until you turn it off")
+        }
+    }
+
+    /// The icon changes to a cup while the Mac is held awake. A mode that
+    /// overrides the energy settings should not be running unnoticed — the
+    /// panel is folded most of the time, and the menu bar is always there.
+    private func observeKeepAwake() {
+        guard let awake = controller?.keepAwake else { return }
+        awake.$isActive
+            .removeDuplicates()
+            .sink { [weak self] active in
+                MainActor.assumeIsolated { self?.updateStatusIcon(keepingAwake: active) }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func updateStatusIcon(keepingAwake: Bool) {
+        let image = NSImage(
+            systemSymbolName: keepingAwake ? "cup.and.saucer.fill" : "eye.fill",
+            accessibilityDescription: keepingAwake ? localized("Cyclop — Keep Mac Awake is on") : "Cyclop"
+        )
+        image?.isTemplate = true
+        statusItem?.button?.image = image
     }
 
     /// The parent item carries the summary: a tick when every section is

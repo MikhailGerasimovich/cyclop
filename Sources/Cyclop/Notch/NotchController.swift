@@ -85,6 +85,14 @@ final class NotchController {
     /// method per section would be four methods that only forward.
     var privacy: PrivacyMode? { vm?.privacy }
 
+    /// Same: the menu bar has a switch for it and shows on its icon that it
+    /// is on.
+    var keepAwake: KeepAwake? { vm?.keepAwake }
+
+    /// Whether Keep Awake's tab is on the rail. Off, the menu hides its switch
+    /// too — the mode is a part of that tab, and a hidden tab runs nothing.
+    var isKeepAwakeAvailable: Bool { vm?.isVisible(.utilities) ?? false }
+
     // MARK: - Displays
 
     /// Diffs the connected displays against what is already built, keyed by
